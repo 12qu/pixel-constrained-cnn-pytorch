@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from utils.masks import get_conditional_pixels
 from torchvision.utils import make_grid
 
+import tqdm
 
 class Trainer():
     """Class used to train PixelCNN models without conditioning.
@@ -59,8 +60,18 @@ class Trainer():
             print("\nEpoch {}/{}".format(epoch + 1, epochs))
             epoch_loss = self._train_epoch(data_loader)
             mean_epoch_loss = epoch_loss / len(data_loader)
-            print("Epoch loss: {}".format(mean_epoch_loss))
             self.mean_epoch_losses.append(mean_epoch_loss)
+
+            tot_loss = 0.
+            n = 0
+            for (batch, _) in tqdm.tqdm(data_loader):
+                batch = batch.to(self.device)
+                norm_batch = batch.float() / (self.model.num_colors - 1)
+                logits = self.model(norm_batch)
+                batch_nll = -torch.sum(F.log_softmax(logits, dim=1))
+                tot_loss += batch_nll.item()
+                n += len(batch)
+            print("Epoch loss: {}".format(tot_loss / n))
 
             # Create a grid of model samples (limit number of samples by scaling
             # by number of pixels in output image; this is needed because of
